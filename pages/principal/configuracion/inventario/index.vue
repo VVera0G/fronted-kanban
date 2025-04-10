@@ -1,195 +1,228 @@
 <template>
-  <v-container>
-    <h1 class="text-h4 mb-4">
-      Inventario
-    </h1>
+  <v-container fluid>
+    <v-row>
+      <v-col cols="12">
+        <v-text-field
+          v-model="busqueda"
+          label="Buscar producto"
+          prepend-icon="mdi-magnify"
+          solo
+          clearable
+          @input="filtrarProductos"
+        />
+      </v-col>
 
-    <!-- Barra de búsqueda y botón de agregar -->
-    <v-row align="center" justify="space-between">
-      <v-col cols="12" md="6">
-        <v-text-field v-model="search" label="Buscar producto" append-icon="mdi-magnify" solo />
+      <v-col cols="12">
+        <v-card>
+          <v-card-title>Inventario General</v-card-title>
+          <v-simple-table>
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Total de Productos</th>
+                <th>Más Vendido</th>
+                <th>Existencias Bajas</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ resumen.categorias.join(', ') }}</td>
+                <td>{{ resumen.total }}</td>
+                <td>{{ resumen.masVendido }}</td>
+                <td>{{ resumen.existenciasBajas }}</td>
+              </tr>
+            </tbody>
+          </v-simple-table>
+        </v-card>
       </v-col>
-      <v-col cols="12" md="3" class="text-right">
-        <v-btn color="primary" @click="openDialog">
-          <v-icon left>
-            mdi-plus
-          </v-icon>
-          Agregar Producto
-        </v-btn>
-        <v-btn color="secondary" class="ml-2" @click="filtrarPorCategoria">
-          <v-icon left>
-            mdi-filter-variant
-          </v-icon>
-          Filtrar
-        </v-btn>
+
+      <v-col cols="12">
+        <v-card>
+          <v-card-title class="d-flex justify-space-between">
+            <span>Productos</span>
+            <div>
+              <v-btn color="primary" @click="abrirDialogo">
+                Agregar Producto
+              </v-btn>
+              <v-btn @click="filtrarPorCategoria">
+                Filtrar por Categoría
+              </v-btn>
+            </div>
+          </v-card-title>
+
+          <v-data-table
+            :headers="headers"
+            :items="productosFiltrados"
+            item-value="id"
+            class="elevation-1"
+          >
+            <!-- Imagen del producto -->
+            <template #item.imagen="{ item }">
+              <v-img :src="item.imagen" max-width="75" max-height="75" contain />
+            </template>
+
+            <!-- Disponibilidad con color -->
+            <template #item.disponibilidad="{ item }">
+              <v-chip :color="item.disponibilidad === 'Disponible' ? 'green' : 'red'" dark>
+                {{ item.disponibilidad }}
+              </v-chip>
+            </template>
+
+            <!-- Botones de acción -->
+            <template #item.acciones="{ item }">
+              <v-btn icon @click="editarProducto(item)">
+                <v-icon>mdi-pencil</v-icon>
+              </v-btn>
+            </template>
+          </v-data-table>
+        </v-card>
       </v-col>
+
+      <v-dialog v-model="dialogo" max-width="600px">
+        <v-card>
+          <v-card-title>{{ editando ? 'Editar Producto' : 'Agregar Producto' }}</v-card-title>
+          <v-card-text>
+            <v-form>
+              <v-text-field v-model="producto.nombre" label="Nombre del Producto" />
+              <v-text-field v-model="producto.imagen" label="URL de la Imagen" />
+              <v-img :src="producto.imagen" max-height="150" max-width="150" contain class="my-2" />
+              <v-text-field v-model="producto.id" label="ID del Producto" />
+              <v-text-field v-model="producto.categoria" label="Categoría" />
+              <v-text-field v-model="producto.precio" label="Precio" type="number" />
+              <v-text-field v-model="producto.cantidadPorPaquete" label="Cantidad por Paquete" type="number" />
+              <v-text-field v-model="producto.unidades" label="Unidades" type="number" />
+              <v-text-field v-model="producto.fechaCaducidad" label="Fecha de Caducidad" type="date" />
+              <v-btn-toggle v-model="producto.disponibilidad" mandatory class="mt-4">
+                <v-btn value="Disponible" color="green" dark>
+                  Disponible
+                </v-btn>
+                <v-btn value="No disponible" color="red" dark>
+                  No disponible
+                </v-btn>
+              </v-btn-toggle>
+            </v-form>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn color="blue darken-1" text @click="guardarProducto">
+              Guardar
+            </v-btn>
+            <v-btn color="red darken-1" text @click="cerrarDialogo">
+              Cancelar
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-row>
-
-    <!-- Tabla resumen del inventario -->
-    <v-card class="mb-6">
-      <v-card-title>Inventario General</v-card-title>
-      <v-simple-table>
-        <thead>
-          <tr>
-            <th>Categoría</th>
-            <th>Total de productos</th>
-            <th>Lo más vendido</th>
-            <th>Existencias bajas</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="resumen in resumenInventario" :key="resumen.categoria">
-            <td>{{ resumen.categoria }}</td>
-            <td>{{ resumen.total }}</td>
-            <td>{{ resumen.masVendido }}</td>
-            <td>{{ resumen.bajoStock }}</td>
-          </tr>
-        </tbody>
-      </v-simple-table>
-    </v-card>
-
-    <!-- Tabla de productos -->
-    <v-data-table
-      :headers="headers"
-      :items="productosFiltrados"
-      class="elevation-1"
-    >
-      <template #[`item.disponibilidad`]="{ item }">
-        <v-chip :color="item.disponibilidad ? 'green' : 'red'" dark>
-          {{ item.disponibilidad ? 'Disponible' : 'Agotado' }}
-        </v-chip>
-      </template>
-
-      <template #[`item.actions`]="{ item }">
-        <v-icon small class="mr-2" @click="editarProducto(item)">
-          mdi-pencil
-        </v-icon>
-      </template>
-    </v-data-table>
-
-    <!-- Modal para agregar/editar producto -->
-    <v-dialog v-model="dialog" max-width="600px">
-      <v-card>
-        <v-card-title>
-          <span class="text-h6">{{ editMode ? 'Editar Producto' : 'Agregar Producto' }}</span>
-        </v-card-title>
-        <v-card-text>
-          <v-form ref="form">
-            <v-text-field v-model="productoActual.imagen" label="URL de Imagen" required />
-            <v-text-field v-model="productoActual.nombre" label="Nombre del producto" required />
-            <v-text-field v-model="productoActual.id" label="ID del producto" readonly />
-            <v-select v-model="productoActual.categoria" :items="categorias" label="Categoría" required />
-            <v-text-field v-model="productoActual.cantidadPorPaquete" label="Cantidad por paquete" type="number" required />
-            <v-text-field v-model="productoActual.unidades" label="Unidades (paquetes)" type="number" required />
-            <v-text-field v-model="productoActual.fechaCaducidad" label="Fecha de caducidad" type="date" required />
-            <v-switch v-model="productoActual.disponibilidad" label="¿Disponible?" />
-          </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn text @click="cerrarDialog">
-            Cancelar
-          </v-btn>
-          <v-btn color="primary" @click="guardarProducto">
-            {{ editMode ? 'Actualizar' : 'Agregar' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </v-container>
 </template>
 
 <script>
 export default {
+  layout: 'default',
   data () {
     return {
-      search: '',
-      dialog: false,
-      editMode: false,
-      categorias: ['Limpieza', 'Alimentos', 'Electrodomésticos'],
-      resumenInventario: [
-        { categoria: 'Limpieza', total: 20, masVendido: 'Cloro', bajoStock: 3 },
-        { categoria: 'Alimentos', total: 50, masVendido: 'Arroz', bajoStock: 5 },
-        { categoria: 'Electrodomésticos', total: 10, masVendido: 'Licuadora', bajoStock: 2 }
-      ],
-      headers: [
-        { text: 'Producto', value: 'nombre' },
-        { text: 'Precio', value: 'precio' },
-        { text: 'Cantidad por paquete', value: 'cantidadPorPaquete' },
-        { text: 'Límite por pedido', value: 'limitePedido' },
-        { text: 'Caducidad', value: 'fechaCaducidad' },
-        { text: 'Disponibilidad', value: 'disponibilidad' },
-        { text: 'Acciones', value: 'actions', sortable: false }
-      ],
+      busqueda: '',
+      dialogo: false,
+      editando: false,
       productos: [],
-      productoActual: {
-        id: '',
+      producto: {
         nombre: '',
         imagen: '',
+        id: '',
         categoria: '',
+        precio: '',
         cantidadPorPaquete: '',
         unidades: '',
         fechaCaducidad: '',
-        disponibilidad: true,
-        precio: '',
-        limitePedido: ''
-      }
+        disponibilidad: 'Disponible'
+      },
+      resumen: {
+        categorias: ['Alimentos', 'Limpieza'],
+        total: 0,
+        masVendido: 'Producto X',
+        existenciasBajas: 0
+      },
+      headers: [
+        { text: 'Imagen', value: 'imagen' },
+        { text: 'Nombre', value: 'nombre' },
+        { text: 'Precio', value: 'precio' },
+        { text: 'Cantidad por Paquete', value: 'cantidadPorPaquete' },
+        { text: 'Unidades', value: 'unidades' },
+        { text: 'Fecha de Caducidad', value: 'fechaCaducidad' },
+        { text: 'Disponibilidad', value: 'disponibilidad' },
+        { text: 'Acciones', value: 'acciones', sortable: false }
+      ]
     }
   },
   computed: {
     productosFiltrados () {
-      if (!this.search) { return this.productos }
-      return this.productos.filter(p => p.nombre.toLowerCase().includes(this.search.toLowerCase()))
+      return this.productos.filter(p =>
+        p.nombre.toLowerCase().includes(this.busqueda.toLowerCase())
+      )
     }
   },
+  mounted () {
+    this.obtenerProductos()
+  },
   methods: {
-    openDialog () {
-      this.editMode = false
-      this.dialog = true
-      this.resetProductoActual()
+    abrirDialogo () {
+      this.dialogo = true
+      this.editando = false
+      this.producto = {
+        nombre: '', imagen: '', id: '', categoria: '', precio: '', cantidadPorPaquete: '', unidades: '', fechaCaducidad: '', disponibilidad: 'Disponible'
+      }
     },
-    cerrarDialog () {
-      this.dialog = false
+    cerrarDialogo () {
+      this.dialogo = false
+    },
+    async guardarProducto () {
+      try {
+        const productoParaEnviar = {
+          id: this.producto.id,
+          name: this.producto.nombre, // <- asegúrate que en el frontend es `nombre`
+          imageUrl: this.producto.imagen, // <- asegúrate que así lo tienes
+          category: this.producto.categoria,
+          price: Number(this.producto.precio),
+          packageQuantity: Number(this.producto.cantidadPorPaquete),
+          units: Number(this.producto.unidades),
+          expirationDate: this.producto.fechaCaducidad,
+          availability: this.producto.disponible
+        }
+
+        const response = await this.$axios.post('http://localhost:3000/api/products/create', productoParaEnviar)
+        console.log('Producto guardado:', response.data)
+        this.obtenerProductos() // recarga los productos
+      } catch (error) {
+        console.error('Error al guardar producto:', error)
+      }
     },
     editarProducto (item) {
-      this.editMode = true
-      this.dialog = true
-      this.productoActual = { ...item }
+      this.producto = { ...item }
+      this.dialogo = true
+      this.editando = true
     },
-    guardarProducto () {
-      if (this.editMode) {
-        const index = this.productos.findIndex(p => p.id === this.productoActual.id)
-        if (index !== -1) { this.productos.splice(index, 1, { ...this.productoActual }) }
-      } else {
-        this.productoActual.id = Date.now().toString()
-        this.productos.push({ ...this.productoActual })
-      }
-      this.cerrarDialog()
+    filtrarProductos () {
+      // Esto ya está integrado con computed
     },
     filtrarPorCategoria () {
-      // lógica de filtrado opcional aquí
-      alert('Filtrar por categoría (pendiente)')
+      // Lógica de filtrado futura
     },
-    resetProductoActual () {
-      this.productoActual = {
-        id: '',
-        nombre: '',
-        imagen: '',
-        categoria: '',
-        cantidadPorPaquete: '',
-        unidades: '',
-        fechaCaducidad: '',
-        disponibilidad: true,
-        precio: '',
-        limitePedido: ''
+    mounted () {
+      this.obtenerProductos()
+    },
+    async obtenerProductos () {
+      try {
+        const response = await this.$axios.get('http://localhost:3000/api/products')
+        this.productos = response.data
+        this.resumen.total = this.productos.length
+        this.resumen.categorias = [...new Set(this.productos.map(p => p.categoria))]
+        this.resumen.masVendido = this.productos[0]?.nombre || 'N/A'
+        this.resumen.existenciasBajas = this.productos.filter(p => p.unidades < 5).length
+      } catch (error) {
+        console.error('Error al obtener productos:', error)
       }
     }
   }
 }
 </script>
-
-    <style scoped>
-    .v-data-table {
-      font-size: 14px;
-    }
-    </style>
